@@ -56,6 +56,9 @@ namespace vsock {
         template <typename FuncType, typename RetType = std::invoke_result_t<std::decay_t<FuncType>>>
         [[nodiscard]] std::future<RetType> AddSyncTask(FuncType&& task);
 
+        template <class FuncType, class... Args>
+        auto AddTask(FuncType&& task_func, Args&&... args) -> std::future<decltype(task_func(args...))>;
+
     private:
 
         DestroyType destroy_type_;
@@ -120,6 +123,34 @@ namespace vsock {
             }
         });
         return task_promise->get_future();
+    }
+
+    template<class FuncType, class ...Args>
+    inline auto ThreadPool::AddTask(FuncType&& task_func, Args && ...args) -> std::future<decltype(task_func(args ...))> {
+
+        {
+            const std::scoped_lock tasks_lock(tasks_mutex_);
+            if (!working_)
+                throw std::runtime_error(
+                    "Delegating task to a threadpool "
+                    "that has been terminated or canceled.");
+        }
+
+        using return_t = decltype(task_func(args...));
+        using future_t = std::future<return_t>;
+        using task_t = std::packaged_task<return_t()>;
+
+        auto bind_func = std::bind(std::forward<FuncType>(task_func), std::forward<Args>(args)...);
+        std::shared_ptr<task_t> task = std::make_shared<task_t>(std::move(bind_func));
+        future_t res = task->get_future();
+
+        {
+            const std::scoped_lock tasks_lock(tasks_mutex_);
+            tasks_.emplace_back([task]() -> void { (*task)(); });
+        }
+
+        tasks_available_cv_.notify_one();
+        return res;
     }
 
 }

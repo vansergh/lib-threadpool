@@ -78,19 +78,40 @@ int main() {
         std::size_t avg{ 0 };
         for (int z = 0; z < avg_rounds; ++z) {
             LogDuration log("test1", false);
-            cout << "ROUND#" << (z + 1) << " --------------\n";
+            //cout << "ROUND#" << (z + 1) << " --------------\n";
             for (int i = 0; i < task_count; ++i) {
-                //pool.AddAsyncTask([&](){HardTest2(test_size);});
-                auto res = pool.AddSyncTask([&]() -> std::size_t {return HardTest2(test_size);});
-                cout << "\t["<<i<<"] = "  << std::to_string(res.get()) << '\n';
+                pool.AddAsyncTask([&](){HardTest2(test_size);});
+                //auto res = pool.AddSyncTask([&]() -> std::size_t {return HardTest2(test_size);});
+                //cout << "\t["<<i<<"] = "  << std::to_string(res.get()) << '\n';
             }
             std::size_t time = log.GetTime();
-            cout << "ROUND#" << (z + 1) << ": " << FormatThousands(time) << " ns" << "\n";
+            //cout << "ROUND#" << (z + 1) << ": " << FormatThousands(time) << " ns" << "\n";
             avg += time;
             
         }
         avg /= avg_rounds;
         cout << "--------------------------------------\n"s;
         cout << "test1:\t\t\t" << FormatThousands(avg) << " ns" << endl;
-    }
+    } 
+
+    {
+        std::size_t avg{ 0 };
+        for (int z = 0; z < avg_rounds; ++z) {
+            LogDuration log("test1", false);
+            //cout << "ROUND#" << (z + 1) << " --------------\n";
+            for (int i = 0; i < task_count; ++i) {
+                pool.AddTask(HardTest2,test_size);
+                //pool.AddTask([&](){HardTest2(test_size);});
+                //auto res = pool.AddTask([&]() -> std::size_t {return HardTest2(test_size);});
+                //cout << "\t["<<i<<"] = "  << std::to_string(res.get()) << '\n';
+            }
+            std::size_t time = log.GetTime();
+            //cout << "ROUND#" << (z + 1) << ": " << FormatThousands(time) << " ns" << "\n";
+            avg += time;
+            
+        }
+        avg /= avg_rounds;
+        //cout << "--------------------------------------\n"s;
+        cout << "test2:\t\t\t" << FormatThousands(avg) << " ns" << endl;
+    }    
 }
