@@ -8,7 +8,6 @@
 #include <mutex>
 #include <threadpool.hpp>
 #include <log_duration.hpp>
-#include <bs_threadpool.hpp>
 
 using namespace std;
 using namespace vsock;
