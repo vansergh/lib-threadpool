@@ -1,6 +1,7 @@
 #ifndef INCLUDE_GUARD_THREADPOOL_HPP
 #define INCLUDE_GUARD_THREADPOOL_HPP
 
+#include <iostream>
 #include <cstdint>
 #include <cstddef> 
 #include <thread>
@@ -50,14 +51,8 @@ namespace vsock {
         void Reset(const std::uint32_t concurency);
         void Reset(const std::uint32_t concurency, const DestroyType destroy_type);
 
-        template <typename FuncType>
-        void AddAsyncTask(FuncType&& task);
-
-        template <typename FuncType, typename RetType = std::invoke_result_t<std::decay_t<FuncType>>>
-        [[nodiscard]] std::future<RetType> AddSyncTask(FuncType&& task);
-
-        template <class FuncType, class... Args>
-        auto AddTask(FuncType&& task_func, Args&&... args) -> std::future<decltype(task_func(args...))>;
+        template<typename FuncType, class ...Args>
+        auto AddTask(FuncType&& task, Args && ...args) -> std::future<decltype(task(args ...))>;
 
     private:
 
@@ -85,6 +80,9 @@ namespace vsock {
         void Finish_();
         void Process_(const std::uint32_t thread_index);
 
+        template <typename FuncType>
+        void PushTask_(FuncType&& task);        
+
     };
 
     //////////////////////////////////////////////////////////////////////////////////
@@ -92,7 +90,7 @@ namespace vsock {
     ////////////////////////////////////////////////////////////////////////////////
 
     template<typename FuncType>
-    inline void ThreadPool::AddAsyncTask(FuncType&& task) {
+    inline void ThreadPool::PushTask_(FuncType&& task) {
         {
             const std::scoped_lock tasks_lock(tasks_mutex_);
             tasks_.emplace_back(std::forward<FuncType>(task));
@@ -100,18 +98,21 @@ namespace vsock {
         tasks_available_cv_.notify_one();
     }
 
-    template<typename FuncType, typename RetType>
-    inline std::future<RetType> ThreadPool::AddSyncTask(FuncType&& task) {
-        const std::shared_ptr<std::promise<RetType>> task_promise = std::make_shared<std::promise<RetType>>();
-        AddAsyncTask(
-            [task = std::forward<FuncType>(task), task_promise] {
+    template<typename FuncType, class ...Args>
+    inline auto ThreadPool::AddTask(FuncType&& task, Args && ...args) -> std::future<decltype(task(args ...))>
+    {
+        using return_t = decltype(task(args ...));
+        
+        const std::shared_ptr<std::promise<return_t>> task_promise = std::make_shared<std::promise<return_t>>();
+        PushTask_(
+            [task = std::forward<FuncType>(task), args = (std::forward<Args>(args), ...), task_promise] {
             try {
-                if constexpr (std::is_void_v<RetType>) {
-                    task();
+                if constexpr (std::is_void_v<return_t>) {
+                    task(args);
                     task_promise->set_value();
                 }
                 else {
-                    task_promise->set_value(task());
+                    task_promise->set_value(task(args));
                 }
             }
             catch (...) {
@@ -123,34 +124,6 @@ namespace vsock {
             }
         });
         return task_promise->get_future();
-    }
-
-    template<class FuncType, class ...Args>
-    inline auto ThreadPool::AddTask(FuncType&& task_func, Args && ...args) -> std::future<decltype(task_func(args ...))> {
-
-        {
-            const std::scoped_lock tasks_lock(tasks_mutex_);
-            if (!working_)
-                throw std::runtime_error(
-                    "Delegating task to a threadpool "
-                    "that has been terminated or canceled.");
-        }
-
-        using return_t = decltype(task_func(args...));
-        using future_t = std::future<return_t>;
-        using task_t = std::packaged_task<return_t()>;
-
-        auto bind_func = std::bind(std::forward<FuncType>(task_func), std::forward<Args>(args)...);
-        std::shared_ptr<task_t> task = std::make_shared<task_t>(std::move(bind_func));
-        future_t res = task->get_future();
-
-        {
-            const std::scoped_lock tasks_lock(tasks_mutex_);
-            tasks_.emplace_back([task]() -> void { (*task)(); });
-        }
-
-        tasks_available_cv_.notify_one();
-        return res;
     }
 
 }
