@@ -61,32 +61,42 @@ void PrintTask(int id) {
 
     std::this_thread::sleep_for(std::chrono::seconds(time));
     mtx_.lock();
-    cout << "task# " << id << " sleep " << time << endl;
+    cout << "PrintTask: task# " << id << " sleep " << time << endl;
+    mtx_.unlock();
+}
+
+void PrintTask2() {
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(1, 5);
+    int time = dist6(rng);
+
+    std::this_thread::sleep_for(std::chrono::seconds(time));
+    mtx_.lock();
+    cout << "PrintTask2: " << " sleep " << time << endl;
     mtx_.unlock();
 }
 
 int main() {
 
-    int avg_rounds{ 5 };
-    int task_count{ 100 };
+    int avg_rounds{ 3 };
+    int task_count{ 10 };
     int test_size{ 1000 };
     int thread_count{ 32 };
     ThreadPool pool(thread_count);
-    auto ret = pool.AddSyncTask2(HardTest2, 1000);
 
     cout << "\n=========================================================================\n"s;
-    cout << ret.get();
-    //cout << t.get();
-    /*     cout << "\n=========================================================================\n"s;
     {
         std::size_t avg{ 0 };
         for (int z = 0; z < avg_rounds; ++z) {
             LogDuration log("test1", false);
             //cout << "ROUND#" << (z + 1) << " --------------\n";
             for (int i = 0; i < task_count; ++i) {
-                pool.AddAsyncTask([&](){HardTest2(test_size);});
-                //auto res = pool.AddSyncTask([&]() -> std::size_t {return HardTest2(test_size);});
-                //cout << "\t["<<i<<"] = "  << std::to_string(res.get()) << '\n';
+                pool.AddAsyncTask([&]() {HardTest1(test_size);});
+                pool.AddAsyncTask([&]() {PrintTask2();});
+                pool.AddAsyncTask([=]() {PrintTask(i);});
+                auto res = pool.AddSyncTask([&]() -> std::size_t {return HardTest2(test_size);});
+                cout << "\t["<<i<<"] = "  << std::to_string(res.get()) << '\n';
             }
             std::size_t time = log.GetTime();
             //cout << "ROUND#" << (z + 1) << ": " << FormatThousands(time) << " ns" << "\n";
@@ -96,26 +106,6 @@ int main() {
         avg /= avg_rounds;
         cout << "--------------------------------------\n"s;
         cout << "test1:\t\t\t" << FormatThousands(avg) << " ns" << endl;
-    }  */
+    }
 
-    /*     {
-            std::size_t avg{ 0 };
-            for (int z = 0; z < avg_rounds; ++z) {
-                LogDuration log("test1", false);
-                //cout << "ROUND#" << (z + 1) << " --------------\n";
-                for (int i = 0; i < task_count; ++i) {
-                    pool.AddTask(HardTest2,test_size);
-                    //pool.AddTask([&](){HardTest2(test_size);});
-                    //auto res = pool.AddTask([&]() -> std::size_t {return HardTest2(test_size);});
-                    //cout << "\t["<<i<<"] = "  << std::to_string(res.get()) << '\n';
-                }
-                std::size_t time = log.GetTime();
-                //cout << "ROUND#" << (z + 1) << ": " << FormatThousands(time) << " ns" << "\n";
-                avg += time;
-
-            }
-            avg /= avg_rounds;
-            //cout << "--------------------------------------\n"s;
-            cout << "test2:\t\t\t" << FormatThousands(avg) << " ns" << endl;
-        }     */
 }
