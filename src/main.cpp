@@ -7,6 +7,7 @@
 #include <random>
 #include <mutex>
 #include <threadpool.hpp>
+#include <mtrebi/threadpool.hpp>
 #include <log_duration.hpp>
 
 using namespace std;
@@ -83,10 +84,10 @@ int main() {
     int task_count{ 10 };
     int test_size{ 1000 };
     int thread_count{ 32 };
-    ThreadPool pool(thread_count);
 
     cout << "\n=========================================================================\n"s;
     {
+        ThreadPool pool(thread_count);
         std::size_t avg{ 0 };
         for (int z = 0; z < avg_rounds; ++z) {
             LogDuration log("test1", false);
@@ -107,5 +108,6 @@ int main() {
         cout << "--------------------------------------\n"s;
         cout << "test1:\t\t\t" << FormatThousands(avg) << " ns" << endl;
     }
+  
 
 }

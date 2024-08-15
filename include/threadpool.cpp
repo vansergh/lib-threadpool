@@ -149,15 +149,14 @@ namespace vsock {
                 [this] {
                 return !(paused_ || tasks_.empty()) || !working_;
             });
-            if (!working_)
+            if (!working_) {
                 break;
-            {
-                const std::function<void()> task = std::move(tasks_.front());
-                tasks_.pop_front();
-                ++tasks_running_;
-                tasks_lock.unlock();
-                task();
             }
+            const std::function<void()> task = std::move(tasks_.front());
+            tasks_.pop_front();
+            ++tasks_running_;
+            tasks_lock.unlock();
+            task();
             tasks_lock.lock();
         }
     }

@@ -56,10 +56,10 @@ namespace vsock {
         template <typename FuncType, typename RetType = std::invoke_result_t<std::decay_t<FuncType>>>
         [[nodiscard]] std::future<RetType> AddSyncTask(FuncType&& task);
 
-
+        /* 
         template <class FuncType, class... Args>
         auto AddTask(FuncType&& task_func, Args&&... args) -> std::future<decltype(task_func(args...))>;
-
+        */
     private:
 
         DestroyType destroy_type_;
@@ -125,7 +125,7 @@ namespace vsock {
         });
         return task_promise->get_future();
     }
-
+    /* 
     template<class FuncType, class ...Args>
     inline auto ThreadPool::AddTask(FuncType&& task_func, Args && ...args) -> std::future<decltype(task_func(args ...))> {
 
@@ -154,6 +154,7 @@ namespace vsock {
         tasks_available_cv_.notify_one();
         return res;
     }
+    */
 
 }
 
