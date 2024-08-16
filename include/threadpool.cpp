@@ -152,11 +152,16 @@ namespace vsock {
             if (!working_) {
                 break;
             }
-            const std::function<void()> task = std::move(tasks_.front());
+            Task task = std::move(tasks_.front());
             tasks_.pop_front();
             ++tasks_running_;
             tasks_lock.unlock();
-            task();
+            if (task()) {
+                tasks_lock.lock();
+                tasks_.emplace_back(std::move(task));
+                tasks_lock.unlock();
+                tasks_available_cv_.notify_one();
+            }
             tasks_lock.lock();
         }
     }

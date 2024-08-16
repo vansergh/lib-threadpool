@@ -7,7 +7,6 @@
 #include <random>
 #include <mutex>
 #include <threadpool.hpp>
-#include <mtrebi/threadpool.hpp>
 #include <log_duration.hpp>
 
 using namespace std;
@@ -86,6 +85,9 @@ int main() {
     int thread_count{ 32 };
 
     cout << "\n=========================================================================\n"s;
+
+
+
     {
         ThreadPool pool(thread_count);
         std::size_t avg{ 0 };
@@ -93,11 +95,11 @@ int main() {
             LogDuration log("test1", false);
             //cout << "ROUND#" << (z + 1) << " --------------\n";
             for (int i = 0; i < task_count; ++i) {
-                pool.AddAsyncTask([&]() {HardTest1(test_size);});
-                pool.AddAsyncTask([&]() {PrintTask2();});
-                pool.AddAsyncTask([=]() {PrintTask(i);});
+                pool.AddAsyncTask([&](Task& task) {HardTest1(test_size);});
+                pool.AddAsyncTask([&](Task& task) {PrintTask2();});
+                pool.AddAsyncTask([=](Task& task) {PrintTask(i);});
                 auto res = pool.AddSyncTask([&]() -> std::size_t {return HardTest2(test_size);});
-                cout << "\t["<<i<<"] = "  << std::to_string(res.get()) << '\n';
+                cout << "\t[" << i << "] = " << std::to_string(res.get()) << '\n';
             }
             std::size_t time = log.GetTime();
             //cout << "ROUND#" << (z + 1) << ": " << FormatThousands(time) << " ns" << "\n";
@@ -108,6 +110,37 @@ int main() {
         cout << "--------------------------------------\n"s;
         cout << "test1:\t\t\t" << FormatThousands(avg) << " ns" << endl;
     }
-  
+
+
+    {
+        ThreadPool pool(thread_count);
+
+        pool.AddAsyncTask([](Task& task) {
+            cout << "Begin" << endl;
+        });
+
+        for (int i = 0; i < 32; ++i) {
+
+            Task task;
+            task.AddVariables(0);
+            task.SetConditionFunction([](Task& task) {
+                return std::any_cast<int>(task.GetVariableRef(0)) < 10;
+            });
+            task.SetTaskFuncion([](Task& task) {
+                int& counter = std::any_cast<int&>(task.GetVariableRef(0));
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+
+                cout << "counter = " << counter << '\n';
+                ++counter;
+            });
+            pool.AddAsyncTask(std::move(task));
+
+        }
+
+        pool.AddAsyncTask([](Task& task) {
+            cout << "Hello" << endl;
+        });
+    }
+
 
 }
