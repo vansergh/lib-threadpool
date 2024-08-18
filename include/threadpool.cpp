@@ -1,4 +1,4 @@
-#include <iostream>
+#include <utility>
 #include <threadpool.hpp>
 
 namespace vsock {
@@ -61,6 +61,22 @@ namespace vsock {
         CreateThreads_();
         tasks_lock.lock();
         paused_ = was_paused;
+    }
+
+    void ThreadPool::AddSyncTask(std::unique_ptr<Task> task) {
+        {
+            const std::scoped_lock tasks_lock(tasks_mutex_);
+            tasks_.push_back(std::move(task));
+        }
+        tasks_available_cv_.notify_one();
+    }
+
+    void ThreadPool::AddAsyncTask(std::unique_ptr<Task> task) {
+        {
+            const std::scoped_lock tasks_lock(tasks_mutex_);
+            tasks_.push_back(std::move(task));
+        }
+        tasks_available_cv_.notify_one();
     }
 
     void ThreadPool::Wait() {
@@ -152,15 +168,15 @@ namespace vsock {
             if (!working_) {
                 break;
             }
-            Task task = std::move(tasks_.front());
+            std::unique_ptr<Task> task = std::exchange(tasks_.front(), {});
             tasks_.pop_front();
             ++tasks_running_;
             tasks_lock.unlock();
-            if (task()) {
+            bool not_finished = (*task)();
+            if (not_finished) {
                 tasks_lock.lock();
-                tasks_.emplace_back(std::move(task));
+                tasks_.push_back(std::move(task));
                 tasks_lock.unlock();
-                tasks_available_cv_.notify_one();
             }
             tasks_lock.lock();
         }

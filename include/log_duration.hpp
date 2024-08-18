@@ -19,7 +19,7 @@ namespace vsock {
 
         using Clock = std::chrono::steady_clock;
 
-        LogDuration(const std::string& id, bool print = true) : id_{id}, print_{print} {
+        LogDuration(const std::string& id, bool print = true) : id_{ id }, print_{ print } {
         }
 
         std::size_t GetTime(bool print = false) {
@@ -30,7 +30,7 @@ namespace vsock {
             const auto dur = end_time - start_time_;
             std::size_t res = duration_cast<nanoseconds>(dur).count();
             if (print) {
-                std::cerr << id_ << ": "s << res << " ns"s << std::endl;
+                std::cerr << id_ << ": "s << FormatThousands_(res) << " ns"s << std::endl;
             }
             return res;
         }
@@ -40,6 +40,15 @@ namespace vsock {
         }
 
     private:
+
+        std::string FormatThousands_(std::size_t value) {
+            std::string result = std::to_string(value);
+            for (int i = result.size() - 3; i > 0; i -= 3) {
+                result.insert(i, ",");
+            }
+            return result;
+        }
+
         const std::string id_;
         bool print_;
         const Clock::time_point start_time_ = Clock::now();
