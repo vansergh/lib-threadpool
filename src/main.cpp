@@ -20,6 +20,11 @@ static std::mt19937 rng(dev());
 
 static std::mutex mtx_;
 
+int RandomN(const int from, const int to) {
+    std::uniform_int_distribution<std::mt19937::result_type> dist(from, to);
+    return dist(rng);
+}
+
 std::size_t HardTest2(std::size_t size) {
     std::size_t i, num = 1, primes = 0;
     while (num <= size) {
@@ -51,8 +56,7 @@ bool HardTest1(std::size_t size) {
 }
 
 void PrintTaskWithID(int id, const int sleep_from, const int sleep_to) {
-    std::uniform_int_distribution<std::mt19937::result_type> dist6(sleep_from, sleep_to);
-    int time = dist6(rng);
+    int time = RandomN(sleep_from, sleep_to);
 
     mtx_.lock();
     cout << "PrintTaskWithID: task# " << id << " will sleep " << time << endl;
@@ -67,8 +71,7 @@ void PrintTaskWithID(int id, const int sleep_from, const int sleep_to) {
 
 
 void PrintTask(const int sleep_from, const int sleep_to) {
-    std::uniform_int_distribution<std::mt19937::result_type> dist6(sleep_from, sleep_to);
-    int time = dist6(rng);
+    int time = RandomN(sleep_from, sleep_to);
 
     mtx_.lock();
     cout << "PrintTask: " << " will sleep " << time << endl;
@@ -222,6 +225,34 @@ int main() {
     }
 
     {
+        cout << "Test #L7: -------------------\n";
+        std::unique_ptr<Task> task = std::make_unique<Task>();
+        std::atomic_bool c1{ true };
+        task->AddVariables(std::ref(c1));
+        task->SetCondition([](Task& task) -> bool {
+            std::atomic_bool& c = std::any_cast<std::reference_wrapper<std::atomic_bool>>(task.GetVariable(0));
+            return c;
+        }, std::ref(*task));
+        task->SetLoopJob([](Task& task, ThreadPool* pool) -> void {
+            std::atomic_bool& c = std::any_cast<std::reference_wrapper<std::atomic_bool>>(task.GetVariable(0));
+            mtx_.lock();
+            cout << "loop start. c = " << c << "\n";
+            mtx_.unlock();
+            auto ret = pool->AddSyncTask([]() -> pair<int, int> {
+                return std::make_pair(::RandomN(1, 100), ::RandomN(1, 100));
+            });
+            auto res = ret.get();
+            cout << "first = " << res.first << ", second = " << res.second << "\n";
+            if (res.first > res.second) {
+                c = false;
+            }
+            cout << "loop end. c = " << c << "\n";
+        }, std::ref(*task), & pool);
+        pool.AddAsyncTask(std::move(task));
+        pool.Wait();
+    }
+
+    {
         cout << "Test #G1: -------------------\n";
         for (int z = 0; z < 10; ++z) {
             pool.AddAsyncTask(PrintTask, 1, 1000);
@@ -282,7 +313,7 @@ int main() {
                         res_nums[it->first] = it->second.get();
                         mtx_.lock();
                         cout << "result #" << it->first << " is ready with value " << res_nums[it->first] << "\n";
-                        mtx_.unlock();                               
+                        mtx_.unlock();
                         it = r.erase(it);
                     }
                     else {
