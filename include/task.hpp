@@ -24,8 +24,6 @@ namespace vsock {
 
         Task() = default;
 
-        ~Task();
-
         Task(Task&& other);
         Task& operator=(Task&& other);
 
@@ -80,11 +78,11 @@ namespace vsock {
 
         is_void_ = std::is_void_v<return_type>;
 
-        const std::shared_ptr<bind_type> bind_fnc_ptr = std::make_shared<bind_type>(std::move(std::bind(std::move(job), std::move(args)...)));
+        const std::shared_ptr<bind_type> bind_fnc_ptr = std::make_shared<bind_type>(std::bind(std::forward<F>(job), std::forward<Args>(args)...));
         const std::shared_ptr<promise_type> task_promise_ptr = std::make_shared<promise_type>();
         sync_task_.reset();
         sync_task_ = std::make_unique<std::packaged_task<void(void)>>(
-            std::move(std::packaged_task([bind_fnc_ptr, task_promise_ptr]() {
+            std::packaged_task([bind_fnc_ptr, task_promise_ptr]() {
             try {
                 if constexpr (std::is_void_v<return_type>) {
                     (*bind_fnc_ptr)();
@@ -102,7 +100,7 @@ namespace vsock {
                     throw std::runtime_error("set_exception() failed");
                 }
             }
-        })));
+        }));
 
 
         return task_promise_ptr->get_future();
@@ -115,9 +113,9 @@ namespace vsock {
         condition_.reset();
         is_void_ = true;
         async_task_.reset();
-        async_task_ = std::make_unique<std::function<void(Task&)>>(std::move(
-            std::bind(std::move(job), std::move(args)...)
-        ));
+        async_task_ = std::make_unique<std::function<void(Task&)>>(
+            std::bind(std::forward<F>(job), std::forward<Args>(args)...)
+        );
     }
 
     template<typename F, typename ...Args>
@@ -126,9 +124,9 @@ namespace vsock {
         is_void_ = true;
         sync_task_.reset();
         condition_.reset();
-        condition_ = std::make_unique<std::function<bool(Task&)>>(std::move(
-            std::bind(std::move(condition), std::move(args)...)
-        ));
+        condition_ = std::make_unique<std::function<bool(Task&)>>(
+            std::bind(std::forward<F>(condition), std::forward<Args>(args)...)
+        );
     }
 
     template<typename F, typename ...Args>
@@ -137,14 +135,14 @@ namespace vsock {
         is_void_ = true;
         sync_task_.reset();
         async_task_.reset();
-        async_task_ = std::make_unique<std::function<void(Task&)>>(std::move(
-            std::bind(std::move(loop), std::move(args)...)
-        ));
+        async_task_ = std::make_unique<std::function<void(Task&)>>(
+            std::bind(std::forward<F>(loop), std::forward<Args>(args)...)
+        );
     }
 
     template<typename... Args>
     inline void Task::AddVariables(Args&&... vars) {
-        (vars_.emplace_back(std::move(vars)), ...);
+        (vars_.emplace_back(std::forward<Args>(vars)), ...);
     }
 
 }

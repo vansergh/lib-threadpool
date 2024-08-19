@@ -3,7 +3,7 @@
 
 namespace vsock {
 
-    ThreadPool::ThreadPool(const std::uint32_t concurency, const DestroyType destroy_type) :
+    ThreadPool::ThreadPool(const std::size_t concurency, const DestroyType destroy_type) :
         destroy_type_{ destroy_type },
         threads_{ std::make_unique<std::thread[]>(ChooseThreadsCount_(concurency)) },
         tasks_{ },
@@ -24,7 +24,7 @@ namespace vsock {
         ThreadPool(std::thread::hardware_concurrency(), destroy_type)
     {}
 
-    ThreadPool::ThreadPool(const std::uint32_t concurency) :
+    ThreadPool::ThreadPool(const std::size_t concurency) :
         ThreadPool(concurency, DestroyType::SMOOTH)
     {}
 
@@ -32,9 +32,8 @@ namespace vsock {
         Finish_();
     }
 
-    void ThreadPool::ClearTasks() {
-        const std::scoped_lock tasks_lock(tasks_mutex_);
-        tasks_.clear();
+    void ThreadPool::ClearTasks() noexcept {
+        tasks_.Clear();
     }
 
     void ThreadPool::Reset() {
@@ -45,11 +44,11 @@ namespace vsock {
         Reset(std::thread::hardware_concurrency(), destroy_type);
     }
 
-    void ThreadPool::Reset(const std::uint32_t concurency) {
+    void ThreadPool::Reset(const std::size_t concurency) {
         Reset(concurency, DestroyType::SMOOTH);
     }
 
-    void ThreadPool::Reset(const std::uint32_t concurency, const DestroyType destroy_type) {
+    void ThreadPool::Reset(const std::size_t concurency, const DestroyType destroy_type) {
         std::unique_lock tasks_lock(tasks_mutex_);
         destroy_type_ = destroy_type;
         const bool was_paused = paused_;
@@ -64,37 +63,31 @@ namespace vsock {
     }
 
     void ThreadPool::AddSyncTask(std::unique_ptr<Task> task) {
-        {
-            const std::scoped_lock tasks_lock(tasks_mutex_);
-            tasks_.push_back(std::move(task));
-        }
+        tasks_.PushBack(std::move(task));
         tasks_available_cv_.notify_one();
     }
 
     void ThreadPool::AddAsyncTask(std::unique_ptr<Task> task) {
-        {
-            const std::scoped_lock tasks_lock(tasks_mutex_);
-            tasks_.push_back(std::move(task));
-        }
+        tasks_.PushBack(std::move(task));
         tasks_available_cv_.notify_one();
     }
 
-    void ThreadPool::Wait() {
+    void ThreadPool::Wait() noexcept {
         std::unique_lock tasks_lock(tasks_mutex_);
         waiting_ = true;
         tasks_done_cv_.wait(
             tasks_lock,
-            [this] {return (tasks_running_ == 0) && (paused_ || tasks_.empty());}
+            [this] {return (tasks_running_ == 0) && (paused_ || tasks_.Empty());}
         );
         waiting_ = false;
     }
 
-    void ThreadPool::Pause() {
+    void ThreadPool::Pause() noexcept {
         const std::scoped_lock tasks_lock(tasks_mutex_);
         paused_ = true;
     }
 
-    void ThreadPool::Continue() {
+    void ThreadPool::Continue() noexcept {
         {
             const std::scoped_lock tasks_lock(tasks_mutex_);
             paused_ = false;
@@ -102,7 +95,7 @@ namespace vsock {
         tasks_available_cv_.notify_all();
     }
 
-    std::uint32_t ThreadPool::ChooseThreadsCount_(const std::uint32_t threads_count) const noexcept {
+    std::size_t ThreadPool::ChooseThreadsCount_(const std::size_t threads_count) const noexcept {
         if (threads_count > 0) {
             return threads_count;
         }
@@ -120,8 +113,8 @@ namespace vsock {
             working_ = true;
         }
 
-        for (std::uint32_t index = 0; index < threads_count_; ++index) {
-            threads_[index] = std::thread(&ThreadPool::Process_, this, index);
+        for (std::size_t index = 0; index < threads_count_; ++index) {
+            threads_[index] = std::thread(&ThreadPool::Process_, this);
         }
 
     }
@@ -132,7 +125,7 @@ namespace vsock {
             working_ = false;
         }
         tasks_available_cv_.notify_all();
-        for (std::uint32_t i = 0; i < threads_count_; ++i) {
+        for (std::size_t i = 0; i < threads_count_; ++i) {
             threads_[i].join();
         }
     }
@@ -152,32 +145,34 @@ namespace vsock {
         }
     }
 
-    void ThreadPool::Process_([[maybe_unused]] const std::uint32_t thread_index) {
+    void ThreadPool::Process_() {
         std::unique_lock tasks_lock(tasks_mutex_);
         while (true) {
             --tasks_running_;
             tasks_lock.unlock();
-            if (waiting_ && tasks_running_ == 0 && (paused_ || tasks_.empty())) {
+            if (waiting_ && tasks_running_ == 0 && (paused_ || tasks_.Empty())) {
                 tasks_done_cv_.notify_all();
             }
             tasks_lock.lock();
             tasks_available_cv_.wait(tasks_lock,
                 [this] {
-                return !(paused_ || tasks_.empty()) || !working_;
+                return !(paused_ || tasks_.Empty()) || !working_;
             });
+            
             if (!working_) {
                 break;
             }
-            std::unique_ptr<Task> task = std::exchange(tasks_.front(), {});
-            tasks_.pop_front();
+
             ++tasks_running_;
             tasks_lock.unlock();
+
+            std::unique_ptr<Task> task;
+            tasks_.PopFront(task);            
             bool not_finished = (*task)();
             if (not_finished) {
-                tasks_lock.lock();
-                tasks_.push_back(std::move(task));
-                tasks_lock.unlock();
+                tasks_.PushBack(std::move(task));
             }
+
             tasks_lock.lock();
         }
     }

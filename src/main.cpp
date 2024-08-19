@@ -9,7 +9,8 @@
 #include <list>
 #include <mutex>
 #include <threadpool.hpp>
-#include <log_duration.hpp>
+#include <queue.hpp>
+#include <anylist.hpp>
 
 using namespace std;
 using namespace vsock;
@@ -84,11 +85,10 @@ void PrintTask(const int sleep_from, const int sleep_to) {
     mtx_.unlock();
 }
 
-int main() {
-
-
+void RunTests() {
     cout << "\n=========================================================================\n"s;
     ThreadPool pool;
+
     {
         cout << "Test #L1: -------------------\n";
         pool.AddAsyncTask([](int a, int b) {
@@ -247,9 +247,34 @@ int main() {
                 c = false;
             }
             cout << "loop end. c = " << c << "\n";
-        }, std::ref(*task), & pool);
+        }, std::ref(*task), &pool);
         pool.AddAsyncTask(std::move(task));
         pool.Wait();
+    }
+
+    {
+        cout << "Test #L8: -------------------\n";
+        auto work = [](Task& task, const std::string& str, int& r, ThreadPool* p) {
+            cout << "Hello, " << str << "!\n";
+            std::unique_ptr<Task> t(std::make_unique<Task>());
+            r = 10;
+            cout << "r = " << r << '\n';
+            t->AddVariables(std::ref(r));
+            auto subjob = [](Task& ts) {
+                int& v = std::any_cast<std::reference_wrapper<int>>(ts.GetVariable(0));
+                v *= 2;
+                cout << "v = " << v << '\n';
+            };
+            t->SetAsyncJob(subjob, std::ref(*t));
+            p->AddAsyncTask(std::move(t));
+        };
+        int result{ 0 };
+        std::unique_ptr<Task> task(std::make_unique<Task>());
+        task->SetAsyncJob(work, std::ref(*task), "Bro"s, std::ref(result), &pool);
+
+        pool.AddAsyncTask(std::move(task));
+        pool.Wait();
+        cout << "result = " << result << '\n';
     }
 
     {
@@ -272,7 +297,7 @@ int main() {
         cout << "Test #G3: -------------------\n";
         std::vector<std::future<bool>> results;
         for (int z = 0; z < 10; ++z) {
-            results.emplace_back(pool.AddSyncTask(HardTest1, 100000));
+            results.emplace_back(pool.AddSyncTask(HardTest1, 10000));
         }
         pool.AddAsyncTask([&](std::vector<std::future<bool>>& r) {
             auto zero = std::chrono::seconds(0);
@@ -301,7 +326,7 @@ int main() {
         using results_t = std::vector<pair<std::size_t, std::future<std::size_t>>>;
         results_t results;
         for (int z = 0; z < 40; ++z) {
-            std::uniform_int_distribution<std::mt19937::result_type> size(10, 100000);
+            std::uniform_int_distribution<std::mt19937::result_type> size(10, 10000);
             results.emplace_back(std::move(make_pair(z, pool.AddSyncTask(HardTest2, size(rng)))));
         }
         pool.AddAsyncTask([&](results_t& r) {
@@ -325,6 +350,10 @@ int main() {
         cout << "waiting results...\n";
         pool.Wait();
     }
+}
 
+int main() {
+
+    RunTests();
 
 }

@@ -10,15 +10,6 @@ namespace vsock {
     // Task class defenition
     ////////////////////////////////////////////////////////////////////////////////
 
-    Task::~Task() {
-        /*
-        task_.reset();
-        condition_.reset();
-        vars_.clear();
-        loop_.reset();
-        */
-    }
-
     Task::Task(Task&& other) :
         type_{ std::exchange(other.type_,TaskType::ASYNC) },
         is_void_{ std::exchange(other.is_void_,true) },
