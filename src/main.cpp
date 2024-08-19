@@ -10,7 +10,7 @@
 #include <mutex>
 #include <threadpool.hpp>
 #include <queue.hpp>
-#include <anylist.hpp>
+#include <varlist.hpp>
 
 using namespace std;
 using namespace vsock;
@@ -209,13 +209,13 @@ void RunTests() {
         task->AddVariables(0, 10);
         task->AddVariables("hello"s);
         task->SetCondition([](Task& task) -> bool {
-            const int it = std::any_cast<int>(task.GetVariable(0));
-            const int to = std::any_cast<int>(task.GetVariable(1));
+            const int it = task.GetVariable<int>(0);
+            const int to = task.GetVariable<int>(1);
             return it < to;
         }, std::ref(*task));
         task->SetLoopJob([](Task& task) -> void {
-            int& it = std::any_cast<int&>(task.GetVariable(0));
-            const std::string str = std::any_cast<std::string>(task.GetVariable(2));
+            int& it = task.GetVariable<int>(0);
+            const std::string str = task.GetVariable<std::string>(2);
             cout << "loop #" << it << ": " << str << '\n';
             ++it;
             std::this_thread::sleep_for(std::chrono::milliseconds(30));
@@ -230,11 +230,11 @@ void RunTests() {
         std::atomic_bool c1{ true };
         task->AddVariables(std::ref(c1));
         task->SetCondition([](Task& task) -> bool {
-            std::atomic_bool& c = std::any_cast<std::reference_wrapper<std::atomic_bool>>(task.GetVariable(0));
+            std::atomic_bool& c = task.GetVariable<std::reference_wrapper<std::atomic_bool>>(0);
             return c;
         }, std::ref(*task));
         task->SetLoopJob([](Task& task, ThreadPool* pool) -> void {
-            std::atomic_bool& c = std::any_cast<std::reference_wrapper<std::atomic_bool>>(task.GetVariable(0));
+            std::atomic_bool& c = task.GetVariable<std::reference_wrapper<std::atomic_bool>>(0);
             mtx_.lock();
             cout << "loop start. c = " << c << "\n";
             mtx_.unlock();
@@ -261,7 +261,7 @@ void RunTests() {
             cout << "r = " << r << '\n';
             t->AddVariables(std::ref(r));
             auto subjob = [](Task& ts) {
-                int& v = std::any_cast<std::reference_wrapper<int>>(ts.GetVariable(0));
+                int& v = ts.GetVariable<std::reference_wrapper<int>>(0);
                 v *= 2;
                 cout << "v = " << v << '\n';
             };
@@ -352,8 +352,12 @@ void RunTests() {
     }
 }
 
+class Test {
+public:
+    int val{ 10 };
+};
+
 int main() {
-
     RunTests();
-
+    cout << "Done!" << endl;
 }

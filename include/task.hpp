@@ -8,6 +8,8 @@
 #include <future>
 #include <memory>
 
+#include <varlist.hpp>
+
 namespace vsock {
 
     //////////////////////////////////////////////////////////////////////////////////
@@ -42,7 +44,8 @@ namespace vsock {
         template<typename... Args>
         void AddVariables(Args&&... vars);
 
-        std::any& GetVariable(std::size_t index);
+        template<typename T>
+        T& GetVariable(std::size_t index);
 
         bool IsVoidResult() {
             return is_void_;
@@ -57,7 +60,7 @@ namespace vsock {
         std::unique_ptr<std::packaged_task<void(void)>> sync_task_;
         std::unique_ptr<std::function<void(Task&)>> async_task_{ nullptr };
         std::unique_ptr<std::function<bool(Task&)>> condition_{ nullptr };
-        std::vector<std::any> vars_;
+        VarList vars_;
 
     };
 
@@ -142,9 +145,14 @@ namespace vsock {
 
     template<typename... Args>
     inline void Task::AddVariables(Args&&... vars) {
-        (vars_.emplace_back(std::forward<Args>(vars)), ...);
+        (vars_.Add(std::forward<Args>(vars)), ...);
+    }
+
+    template<typename T>
+    T& Task::GetVariable(std::size_t index) {
+        return vars_.Get<T>(index);
     }
 
 }
 
-#endif
+#endif // INCLUDE_GUARD_TASK_HPP

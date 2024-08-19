@@ -31,10 +31,6 @@ namespace vsock {
         return *this;
     }
 
-    std::any& Task::GetVariable(std::size_t index) {
-        return vars_[index];
-    }
-
     bool Task::operator()() {
         switch (type_) {
             case TaskType::SYNC: {
