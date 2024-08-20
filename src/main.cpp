@@ -256,6 +256,7 @@ void RunTests() {
         cout << "Test #L8: -------------------\n";
         auto work = [](Task& task, const std::string& str, int& r, ThreadPool* p) {
             cout << "Hello, " << str << "!\n";
+            task.AddVariables(str + "123"s);
             std::unique_ptr<Task> t(std::make_unique<Task>());
             r = 10;
             cout << "r = " << r << '\n';
