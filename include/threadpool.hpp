@@ -1,11 +1,8 @@
 #ifndef INCLUDE_GUARD_THREADPOOL_HPP
 #define INCLUDE_GUARD_THREADPOOL_HPP
 
-#include <cstdint>
-#include <cstddef> 
 #include <thread>
 #include <mutex>
-#include <memory>
 #include <deque>
 #include <condition_variable>
 

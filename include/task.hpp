@@ -1,12 +1,10 @@
 #ifndef INCLUDE_GUARD_TASK_HPP
 #define INCLUDE_GUARD_TASK_HPP
 
-#include <any>
 #include <cstdint>
 #include <cstddef>
 #include <functional>
 #include <future>
-#include <memory>
 
 #include <varlist.hpp>
 

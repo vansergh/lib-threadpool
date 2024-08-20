@@ -2,7 +2,6 @@
 #define INCLUDE_GUARD_VARLIST_HPP
 
 #include <varnode.hpp>
-#include <utility>
 
 namespace vsock {
 

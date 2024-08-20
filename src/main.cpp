@@ -357,6 +357,60 @@ void RunTests() {
         pool.Wait();
     }
 
+    {
+        cout << "Test #L4: -------------------\n";
+        std::unique_ptr<Task> main_task = std::make_unique<Task>();
+        std::vector<std::string> strs;
+        std::condition_variable done;
+        bool processed{ false };
+        strs.push_back("initial str");
+        strs.push_back("another initial str");
+        cout << "initial content:\n";
+        for (const auto& s : strs) {
+            cout << s << '\n';
+        }
+        std::function<int(int, int)> calc = [](const int a, const int b) {
+            return a * b;
+        };
+        main_task->vars.Add(std::ref(strs));
+        main_task->vars.Add(std::move(calc));
+        main_task->vars.Add(std::ref(done));
+        main_task->SetAsyncJob([](ThreadPool& pool, Task& task, const int count, bool& processed) {
+            std::vector<std::string>& strs = task.vars.Get<std::reference_wrapper<std::vector<std::string>>>(0);
+            auto fnc = task.vars.Get<std::function<int(int, int)>>(1);
+            std::condition_variable& done = task.vars.Get<std::reference_wrapper<std::condition_variable>>(2);
+            for (int i = 0; i < count; ++i) {
+                int a = RandomN(1, 1000);
+                int b = RandomN(1, 1000);
+                std::future<int> res = pool.AddSyncTask(fnc, a, b);
+                strs.push_back("calculating "s + std::to_string(a) + " * " + std::to_string(b) + " = " + std::to_string(res.get()));
+            }
+            processed = true;
+            done.notify_one();
+        }, std::ref(pool), std::ref(*main_task), 20, std::ref(processed));
+        pool.AddAsyncTask(std::move(main_task));
+
+        std::unique_ptr<Task> wait_task = std::make_unique<Task>();
+        wait_task->vars.Add(std::ref(done));
+        wait_task->SetAsyncJob([](Task& task, const std::vector<std::string>& strs, bool& processed) {
+            std::condition_variable& done = task.vars.Get<std::reference_wrapper<std::condition_variable>>(0);
+            std::mutex mtx;
+            std::unique_lock lock(mtx);
+            while (!processed) {
+                done.wait(lock);
+            }
+            cout << "processed content:\n";
+            for (const auto& s : strs) {
+                cout << s << '\n';
+            }
+
+        }, std::ref(*wait_task), std::ref(strs), std::ref(processed));
+
+        pool.AddAsyncTask(std::move(wait_task));
+
+        pool.Wait();
+    }
+
 }
 
 class Test {
