@@ -443,5 +443,6 @@ public:
 
 int main() {
     RunTests();
+
     cout << "Done!" << endl;
 }
