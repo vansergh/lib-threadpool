@@ -11,24 +11,28 @@ namespace vsock {
     ////////////////////////////////////////////////////////////////////////////////
 
     Task::Task(Task&& other) :
+        vars(std::move(other.vars)),
         type_{ std::exchange(other.type_,TaskType::ASYNC) },
         is_void_{ std::exchange(other.is_void_,true) },
         sync_task_{ std::exchange(other.sync_task_,{}) },
         async_task_{ std::exchange(other.async_task_,{}) },
-        condition_{ std::exchange(other.condition_,{}) },
-        vars_(std::move(other.vars_))
+        condition_{ std::exchange(other.condition_,{}) }
     {}
 
     Task& Task::operator=(Task&& other) {
         if (this != &other) {
+            vars = std::move(other.vars);
             type_ = std::exchange(other.type_, TaskType::ASYNC);
             is_void_ = std::exchange(other.is_void_, true);
             sync_task_ = std::exchange(other.sync_task_, {});
             async_task_ = std::exchange(other.async_task_, {});
             condition_ = std::exchange(other.condition_, {});
-            vars_ = std::move(other.vars_);
         }
         return *this;
+    }
+
+    bool Task::IsVoidResult() {
+        return is_void_;
     }
 
     bool Task::operator()() {

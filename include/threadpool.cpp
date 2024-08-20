@@ -164,16 +164,17 @@ namespace vsock {
             }
 
             ++tasks_running_;
-            tasks_lock.unlock();
+            
 
             std::unique_ptr<Task> task;
-            tasks_.PopFront(task);            
+            tasks_.PopFront(task);
+            tasks_lock.unlock();
             bool not_finished = (*task)();
+            tasks_lock.lock();
             if (not_finished) {
                 tasks_.PushBack(std::move(task));
             }
 
-            tasks_lock.lock();
         }
     }
 

@@ -23,7 +23,7 @@ namespace vsock {
 
     void TaskQueue::PopFront(value_t& task) noexcept {
         const std::scoped_lock rw_lock(mtx_);
-        task = std::exchange(std::deque<std::unique_ptr<Task>>::front(), {});
+        task = std::move(std::deque<std::unique_ptr<Task>>::front());
         std::deque<std::unique_ptr<Task>>::pop_front();
     }
 

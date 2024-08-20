@@ -31,6 +31,9 @@ namespace vsock {
         void Put(T&& data);
 
         template<typename T>
+        T& Emplace(T&& data);
+
+        template<typename T>
         const T& Get() const;
 
         template<typename T>
@@ -68,8 +71,13 @@ namespace vsock {
 
     template<typename T>
     inline void VarNode::Put(T&& data) {
-        Drop();
         data_ = Put_(std::move(data));
+    }
+
+    template<typename T>
+    inline T& VarNode::Emplace(T&& data) {
+        Put(std::move(data));
+        return *(reinterpret_cast<T*>(data_));
     }
 
     template<typename T>
@@ -82,18 +90,17 @@ namespace vsock {
 
     template<typename T>
     inline T& VarNode::Get() {
-        auto h = typeid(T).hash_code();
-        if (h != hash_code_) {
+        if (typeid(T).hash_code() != hash_code_) {
             throw std::runtime_error("bad type");
-        }        
+        }      
         return *(reinterpret_cast<T*>(data_));
     }
 
     template<typename T>
     inline void* VarNode::Put_(T&& data) {
-        T* typed_ptr = new T(std::move(data));
+        void* result = reinterpret_cast<void*>(new T(std::move(data)));
+        Drop();
         hash_code_ = typeid(T).hash_code();
-        void* result = reinterpret_cast<void*>(typed_ptr);
         delete_fnc_ = VarNode::Delete_<T>;
         return result;
     }

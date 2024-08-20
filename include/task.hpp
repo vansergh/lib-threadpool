@@ -41,17 +41,13 @@ namespace vsock {
         template<typename F, typename... Args>
         void SetCondition(F&& condition, Args&&... args);
 
-        template<typename... Args>
-        void AddVariables(Args&&... vars);
-
-        template<typename T>
-        T& GetVariable(std::size_t index);
-
-        bool IsVoidResult() {
-            return is_void_;
-        }
+        bool IsVoidResult();
 
         bool operator()();
+
+    public:
+
+        VarList vars;
 
     private:
 
@@ -60,7 +56,6 @@ namespace vsock {
         std::unique_ptr<std::packaged_task<void(void)>> sync_task_;
         std::unique_ptr<std::function<void(Task&)>> async_task_{ nullptr };
         std::unique_ptr<std::function<bool(Task&)>> condition_{ nullptr };
-        VarList vars_;
 
     };
 
@@ -141,16 +136,6 @@ namespace vsock {
         async_task_ = std::make_unique<std::function<void(Task&)>>(
             std::bind(std::forward<F>(loop), std::forward<Args>(args)...)
         );
-    }
-
-    template<typename... Args>
-    inline void Task::AddVariables(Args&&... vars) {
-        (vars_.Add(std::forward<Args>(vars)), ...);
-    }
-
-    template<typename T>
-    T& Task::GetVariable(std::size_t index) {
-        return vars_.Get<T>(index);
     }
 
 }

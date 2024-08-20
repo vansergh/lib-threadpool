@@ -37,6 +37,7 @@ namespace vsock {
         delete_fnc_(data_);
         data_ = nullptr;
         delete_fnc_ = nullptr;
+        hash_code_ = 0;
     }
 
     bool VarNode::Empty() const noexcept {

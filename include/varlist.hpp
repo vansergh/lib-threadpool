@@ -14,7 +14,7 @@ namespace vsock {
     public:
 
         VarList(const VarList&) = delete;
-        
+
         VarList& operator=(const VarList&) = delete;
 
     public:
@@ -25,6 +25,9 @@ namespace vsock {
 
         template<typename T>
         void Add(T&& var);
+
+        template<typename T>
+        T& Emplace(T&& var);
 
         template<typename T>
         T& Get(std::size_t index);
@@ -57,6 +60,12 @@ namespace vsock {
     inline void VarList::Add(T&& var) {
         Resize_(size_ + 1);
         (nodes_.get() + (size_++))->Put(std::move(var));
+    }
+
+    template<typename T>
+    inline T& VarList::Emplace(T&& var) {
+        Resize_(size_ + 1);
+        return (nodes_.get() + (size_++))->Emplace(std::move(var));
     }
 
     template<typename T>

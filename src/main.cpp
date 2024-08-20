@@ -206,16 +206,17 @@ void RunTests() {
     {
         cout << "Test #L6: -------------------\n";
         std::unique_ptr<Task> task = std::make_unique<Task>();
-        task->AddVariables(0, 10);
-        task->AddVariables("hello"s);
+        task->vars.Add(0);
+        task->vars.Add(10);
+        task->vars.Add("hello"s);
         task->SetCondition([](Task& task) -> bool {
-            const int it = task.GetVariable<int>(0);
-            const int to = task.GetVariable<int>(1);
+            const int it = task.vars.Get<int>(0);
+            const int to = task.vars.Get<int>(1);
             return it < to;
         }, std::ref(*task));
         task->SetLoopJob([](Task& task) -> void {
-            int& it = task.GetVariable<int>(0);
-            const std::string str = task.GetVariable<std::string>(2);
+            int& it = task.vars.Get<int>(0);
+            const std::string str = task.vars.Get<std::string>(2);
             cout << "loop #" << it << ": " << str << '\n';
             ++it;
             std::this_thread::sleep_for(std::chrono::milliseconds(30));
@@ -228,13 +229,13 @@ void RunTests() {
         cout << "Test #L7: -------------------\n";
         std::unique_ptr<Task> task = std::make_unique<Task>();
         std::atomic_bool c1{ true };
-        task->AddVariables(std::ref(c1));
+        task->vars.Add(std::ref(c1));
         task->SetCondition([](Task& task) -> bool {
-            std::atomic_bool& c = task.GetVariable<std::reference_wrapper<std::atomic_bool>>(0);
+            std::atomic_bool& c = task.vars.Get<std::reference_wrapper<std::atomic_bool>>(0);
             return c;
         }, std::ref(*task));
         task->SetLoopJob([](Task& task, ThreadPool* pool) -> void {
-            std::atomic_bool& c = task.GetVariable<std::reference_wrapper<std::atomic_bool>>(0);
+            std::atomic_bool& c = task.vars.Get<std::reference_wrapper<std::atomic_bool>>(0);
             mtx_.lock();
             cout << "loop start. c = " << c << "\n";
             mtx_.unlock();
@@ -256,13 +257,13 @@ void RunTests() {
         cout << "Test #L8: -------------------\n";
         auto work = [](Task& task, const std::string& str, int& r, ThreadPool* p) {
             cout << "Hello, " << str << "!\n";
-            task.AddVariables(str + "123"s);
+            task.vars.Add(str + "123"s);
             std::unique_ptr<Task> t(std::make_unique<Task>());
             r = 10;
             cout << "r = " << r << '\n';
-            t->AddVariables(std::ref(r));
+            t->vars.Add(std::ref(r));
             auto subjob = [](Task& ts) {
-                int& v = ts.GetVariable<std::reference_wrapper<int>>(0);
+                int& v = ts.vars.Get<std::reference_wrapper<int>>(0);
                 v *= 2;
                 cout << "v = " << v << '\n';
             };
@@ -297,7 +298,7 @@ void RunTests() {
     {
         cout << "Test #G3: -------------------\n";
         std::vector<std::future<bool>> results;
-        for (int z = 0; z < 10; ++z) {
+        for (int z = 0; z < 20; ++z) {
             results.emplace_back(pool.AddSyncTask(HardTest1, 10000));
         }
         pool.AddAsyncTask([&](std::vector<std::future<bool>>& r) {
@@ -326,9 +327,13 @@ void RunTests() {
         cout << "Test #G4: -------------------\n";
         using results_t = std::vector<pair<std::size_t, std::future<std::size_t>>>;
         results_t results;
-        for (int z = 0; z < 40; ++z) {
-            std::uniform_int_distribution<std::mt19937::result_type> size(10, 10000);
-            results.emplace_back(std::move(make_pair(z, pool.AddSyncTask(HardTest2, size(rng)))));
+        for (int z = 0; z < 50; ++z) {
+            std::uniform_int_distribution<std::mt19937::result_type> size(10, 30000);
+            mtx_.lock();
+            int value = size(rng);
+            cout << "task #" << z << " posted with value " << value << "\n";
+            mtx_.unlock();
+            results.emplace_back(std::move(make_pair(z, pool.AddSyncTask(HardTest2, value))));
         }
         pool.AddAsyncTask([&](results_t& r) {
             auto zero = std::chrono::seconds(0);
@@ -351,6 +356,7 @@ void RunTests() {
         cout << "waiting results...\n";
         pool.Wait();
     }
+
 }
 
 class Test {
