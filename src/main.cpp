@@ -358,7 +358,7 @@ void RunTests() {
     }
 
     {
-        cout << "Test #L4: -------------------\n";
+        cout << "Test #G5: -------------------\n";
         std::unique_ptr<Task> main_task = std::make_unique<Task>();
         std::vector<std::string> strs;
         std::condition_variable done;
@@ -370,6 +370,7 @@ void RunTests() {
             cout << s << '\n';
         }
         std::function<int(int, int)> calc = [](const int a, const int b) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             return a * b;
         };
         main_task->vars.Add(std::ref(strs));
