@@ -412,6 +412,28 @@ void RunTests() {
         pool.Wait();
     }
 
+    {
+        cout << "Test #G5: -------------------\n";
+        std::unique_ptr<Task> main_task = std::make_unique<Task>();
+        int val{ 10 };
+        main_task->vars.Add(std::ref(val));
+        main_task->SetAsyncJob([](Task& task, ThreadPool& pool) {
+            std::unique_ptr<Task> second_task = std::make_unique<Task>();
+            int& val = second_task->vars.Emplace(std::ref(task.vars.Get<std::reference_wrapper<int>>(0)));
+            ++val;
+            cout << "inside 1 val: " << val << '\n';
+            second_task->SetAsyncJob([](Task& task) {
+                int& val = task.vars.Get<std::reference_wrapper<int>>(0);
+                ++val;
+                cout << "inside 2 val: " << val << '\n';
+            }, std::ref(*second_task));
+            pool.AddAsyncTask(std::move(second_task));
+        }, std::ref(*main_task), std::ref(pool));
+        pool.AddAsyncTask(std::move(main_task));
+        pool.Wait();
+        cout << "outside val: " << val << '\n';
+    }
+
 }
 
 class Test {
